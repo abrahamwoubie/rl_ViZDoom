@@ -73,9 +73,8 @@ class Environment(object):
         s = self.game.get_state()
         player_position_x=s.game_variables[0]
         player_position_y=s.game_variables[1]
-        if(parameter.use_spectrogram):
-            #return(Extract.Extract_Spectrogram(self,player_position_x,player_position_y))
+        if(parameter.use_MFCC):
             return(Extract.Extract_MFCC(self,player_position_x,player_position_y))
         #return self.game.get_state().screen_buffer
     def MapActions(self, action_raw):
-    	return action_raw
+        return action_raw
