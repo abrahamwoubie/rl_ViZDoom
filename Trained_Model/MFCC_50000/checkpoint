@@ -1,0 +1,2 @@
+model_checkpoint_path: "/home/woubie/Paper//Trained_Model/MFCC_50000/model"
+all_model_checkpoint_paths: "/home/woubie/Paper//Trained_Model/MFCC_50000/model"
