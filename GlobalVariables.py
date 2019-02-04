@@ -2,7 +2,8 @@ class GlobalVariables :
 
     #options for running different experiments
     use_MFCC = 0
-    use_Pixels=1
+    use_Pixels=0
+    use_samples=1
 
     #parameters
     how_many_times = 2000000

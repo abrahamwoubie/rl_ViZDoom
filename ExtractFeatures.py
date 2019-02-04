@@ -11,6 +11,7 @@ import librosa # library for audio processing
 
 target_position_x = 100
 target_position_y = 100
+import scipy.io.wavfile
 
 class Extract_Features:
 
@@ -32,7 +33,6 @@ class Extract_Features:
         return self.spec_data * factor
 
     def Extract_MFCC(self,player_pos_x,player_pos_y):
-    #def Extract_Spectrogram(row,col):
         import sys
         from aubio import source, pvoc, mfcc
         from numpy import vstack, zeros, diff
@@ -67,3 +67,33 @@ class Extract_Features:
         else:
             factor=1/distance
         return mfccs*factor
+
+    def Extract_Samples(self,player_pos_x,player_pos_y):
+        data_samples=[]
+        rate, data = scipy.io.wavfile.read('./Audios/Hello.wav')
+        player = [player_pos_x, player_pos_y]
+        target=[target_position_x,target_position_y]
+        distance=scipy.spatial.distance.euclidean(player, target)
+        if (distance == 0):
+            factor = 1
+        else:
+            factor = 1 / distance
+        for i in range(100):
+            data_samples.append(data[i])
+        return np.array(data_samples)*factor
+
+    # def Extract_Samples(self,player_pos_x,player_pos_y):
+    #     player=[player_pos_x,player_pos_y]
+    #     target=[target_position_x,target_position_y]
+    #     distance=scipy.spatial.distance.euclidean(player, target)
+    #
+    #     fs = 100  # sample rate
+    #     f = 2  # the frequency of the signal
+    #     x = np.arange(fs)  # the points on the x axis for plotting
+    #     samples = [np.sin(2 * np.pi * f * (i / fs)) for i in x]
+    #     if (distance == 0):
+    #         factor = 100
+    #     else:
+    #         factor = 1 / distance
+    #     print(samples)
+    #     return np.array(samples)*factor

@@ -53,23 +53,6 @@ scenario_file = Working_Directory + "Scenarios/find.wad"
 
 from Environment import Environment
 
-# how_many_times = 1000
-# replay_memory_size = 100000
-# replay_memory_batch_size = 64
-#
-# Learning_Rate = 0.00025
-# Discount_Factor = 0.99
-#
-# frame_repeat = 10
-# channels = 3
-# #resolution = (40, 40) + (channels,)
-#
-# #resolution = (129, 259) + (1,)
-# channels_audio=1
-#
-# start_eps = 1.0
-# end_eps = 0.1
-# eps_decay_iter = 0.33 * how_many_times
 
 if(parameter.use_MFCC):
     resolution = (455, 13) + (parameter.channels_audio,)
@@ -78,6 +61,11 @@ if(parameter.use_MFCC):
 if(parameter.use_Pixels):
     resolution = (40, 40) + (parameter.channels,)
     Feature='Pixels_'
+
+if(parameter.use_samples):
+    resolution = (1,100) + (parameter.channels_audio,)
+    Feature='Samples_'
+
 
 model_path = Working_Directory + "/Trained_Model/"+Feature+str(parameter.how_many_times)+"/"
 
@@ -138,6 +126,7 @@ class ReplayMemory(object):
 
 class Model(object):
     def __init__(self, session, actions_count):
+
         self.session = session
 
         # Create the input.
