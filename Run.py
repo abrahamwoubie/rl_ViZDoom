@@ -259,14 +259,14 @@ def Test_Model(agent):
 
     list_Episode = []
     list_Reward = []
-    how_many_times=2
+    how_many_times=3
 
     for i in range(1,how_many_times+1):
         print('Running Test',i)
         reward_list=[]
         episode_list=[]
         reward_total = 0
-        number_of_episodes = 2
+        number_of_episodes = 10
         test=0
         while (test < number_of_episodes):
 
@@ -325,7 +325,7 @@ if __name__ == '__main__':
     env = Environment(scenario_file)
     agent = TrainAgent(env.NumActions())
     reward_list_training=[]
-    how_many_times_training=3
+    how_many_times_training=10
     number_of_training_episodes=parameter.how_many_times/parameter.save_each
     for i in range(1,how_many_times_training+1):
         mean_scores=[]
@@ -334,6 +334,7 @@ if __name__ == '__main__':
             agent.Train()
             print('Mean Scores',mean_scores)
             reward_list_training.append(mean_scores)
+        Test_Model(agent)
     print("Mean List Reward",reward_list_training)
     mu_reward_training = np.mean(reward_list_training, axis=0)
     std_reward_training = np.std(reward_list_training, axis=0)
@@ -350,4 +351,4 @@ if __name__ == '__main__':
     plt.show()
 
 
-    Test_Model(agent)
+    #Test_Model(agent)

@@ -4,7 +4,7 @@ class GlobalVariables :
     use_MFCC = 1
 
     #parameters
-    how_many_times = 1000
+    how_many_times = 2000000
     replay_memory_size = 100000
     replay_memory_batch_size = 64
 
@@ -20,4 +20,4 @@ class GlobalVariables :
     end_eps = 0.1
     eps_decay_iter = 0.33 * how_many_times
 
-    save_each = 0.5 * how_many_times
+    save_each = 0.001 * how_many_times

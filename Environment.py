@@ -35,7 +35,7 @@ class Environment(object):
         self.game.add_available_button(Button.MOVE_FORWARD)
         self.game.add_available_button(Button.MOVE_BACKWARD)
 
-        self.game.set_episode_timeout(1000)
+        self.game.set_episode_timeout(2100)
         self.game.set_episode_start_time(14)
         self.game.set_window_visible(False)
         self.game.set_sound_enabled(False)
