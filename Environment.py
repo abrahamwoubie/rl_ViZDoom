@@ -75,6 +75,7 @@ class Environment(object):
         player_position_y=s.game_variables[1]
         if(parameter.use_MFCC):
             return(Extract.Extract_MFCC(self,player_position_x,player_position_y))
-        #return self.game.get_state().screen_buffer
+        if (parameter.use_Pixels):
+            return (self.game.get_state().screen_buffer)/255
     def MapActions(self, action_raw):
         return action_raw

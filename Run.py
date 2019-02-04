@@ -19,6 +19,8 @@ from matplotlib.ticker import MaxNLocator
 
 
 from vizdoom import *
+np.set_printoptions(threshold=np.inf)
+
 
 from ExtractFeatures import Extract_Features
 
@@ -72,6 +74,10 @@ from Environment import Environment
 if(parameter.use_MFCC):
     resolution = (455, 13) + (parameter.channels_audio,)
     Feature='MFCC_'
+
+if(parameter.use_Pixels):
+    resolution = (40, 40) + (parameter.channels,)
+    Feature='Pixels_'
 
 model_path = Working_Directory + "/Trained_Model/"+Feature+str(parameter.how_many_times)+"/"
 
