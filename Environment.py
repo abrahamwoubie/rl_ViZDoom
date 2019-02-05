@@ -78,6 +78,6 @@ class Environment(object):
         if(parameter.use_samples):
             return (Extract.Extract_Samples(self,player_position_x,player_position_y))
         if (parameter.use_Pixels):
-            return (self.game.get_state().screen_buffer)/255
+            return (self.game.get_state().screen_buffer)
     def MapActions(self, action_raw):
         return action_raw

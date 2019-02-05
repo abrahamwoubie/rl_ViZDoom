@@ -63,7 +63,7 @@ if(parameter.use_Pixels):
     Feature='Pixels_'
 
 if(parameter.use_samples):
-    resolution = (1,100) + (parameter.channels_audio,)
+    resolution = (1,116190) + (parameter.channels_audio,)
     Feature='Samples_'
 
 
@@ -320,7 +320,7 @@ if __name__ == '__main__':
     env = Environment(scenario_file)
     agent = TrainAgent(env.NumActions())
     reward_list_training=[]
-    how_many_times_training=10
+    how_many_times_training=3
     number_of_training_episodes=parameter.how_many_times/parameter.save_each
     for i in range(1,how_many_times_training+1):
         mean_scores=[]

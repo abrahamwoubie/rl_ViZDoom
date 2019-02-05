@@ -69,18 +69,29 @@ class Extract_Features:
         return mfccs*factor
 
     def Extract_Samples(self,player_pos_x,player_pos_y):
-        data_samples=[]
-        rate, data = scipy.io.wavfile.read('./Audios/Hello.wav')
+
+        from pydub import AudioSegment
         player = [player_pos_x, player_pos_y]
-        target=[target_position_x,target_position_y]
-        distance=scipy.spatial.distance.euclidean(player, target)
+        target = [target_position_x, target_position_y]
+        distance = scipy.spatial.distance.euclidean(player, target)
         if (distance == 0):
             factor = 1
         else:
             factor = 1 / distance
+        sound = AudioSegment.from_mp3("./Audios/Hello.wav")
+
+        # get raw audio data as a bytestring
+        raw_data = sound.raw_data
+        # get the frame rate
+        sample_rate = sound.frame_rate
+        # get amount of bytes contained in one sample
+        sample_size = sound.sample_width
+        # get channels
+        channels = sound.channels
+        rawdata = []
         for i in range(100):
-            data_samples.append(data[i])
-        return np.array(data_samples)*factor
+                rawdata.append(raw_data[i] * factor)
+        return np.array(rawdata)
 
     # def Extract_Samples(self,player_pos_x,player_pos_y):
     #     player=[player_pos_x,player_pos_y]
@@ -92,8 +103,7 @@ class Extract_Features:
     #     x = np.arange(fs)  # the points on the x axis for plotting
     #     samples = [np.sin(2 * np.pi * f * (i / fs)) for i in x]
     #     if (distance == 0):
-    #         factor = 100
+    #         factor = 1
     #     else:
     #         factor = 1 / distance
-    #     print(samples)
     #     return np.array(samples)*factor
