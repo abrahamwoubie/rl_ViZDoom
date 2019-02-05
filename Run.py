@@ -63,7 +63,7 @@ if(parameter.use_Pixels):
     Feature='Pixels_'
 
 if(parameter.use_samples):
-    resolution = (1,116190) + (parameter.channels_audio,)
+    resolution = (1,100) + (parameter.channels_audio,)
     Feature='Samples_'
 
 

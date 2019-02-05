@@ -92,18 +92,3 @@ class Extract_Features:
         for i in range(100):
                 rawdata.append(raw_data[i] * factor)
         return np.array(rawdata)
-
-    # def Extract_Samples(self,player_pos_x,player_pos_y):
-    #     player=[player_pos_x,player_pos_y]
-    #     target=[target_position_x,target_position_y]
-    #     distance=scipy.spatial.distance.euclidean(player, target)
-    #
-    #     fs = 100  # sample rate
-    #     f = 2  # the frequency of the signal
-    #     x = np.arange(fs)  # the points on the x axis for plotting
-    #     samples = [np.sin(2 * np.pi * f * (i / fs)) for i in x]
-    #     if (distance == 0):
-    #         factor = 1
-    #     else:
-    #         factor = 1 / distance
-    #     return np.array(samples)*factor
