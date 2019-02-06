@@ -59,7 +59,7 @@ if(parameter.use_MFCC):
     Feature='MFCC_'
 
 if(parameter.use_Pixels):
-    resolution = (40, 40) + (parameter.channels,)
+    resolution = (480, 640) + (parameter.channels,)
     Feature='Pixels_'
 
 if(parameter.use_samples):
