@@ -17,6 +17,7 @@ import matplotlib.ticker as ticker
 
 from matplotlib.ticker import MaxNLocator
 
+import skimage.color, skimage.transform
 
 from vizdoom import *
 np.set_printoptions(threshold=np.inf)
@@ -56,27 +57,32 @@ from Environment import Environment
 
 if(parameter.use_MFCC):
     resolution = (455, 13) + (parameter.channels_audio,)
-    Feature='MFCC_'
+    Feature='MFCC'
 
 if(parameter.use_Pixels):
-    resolution = (480, 640) + (parameter.channels,)
-    Feature='Pixels_'
+    resolution = (35, 45) + (parameter.channels,)
+    Feature='Pixels'
 
 if(parameter.use_samples):
     resolution = (1,100) + (parameter.channels_audio,)
-    Feature='Samples_'
+    Feature='Samples'
 
 
-model_path = Working_Directory + "/Trained_Model/"+Feature+str(parameter.how_many_times)+"/"
+model_path = Working_Directory + "/Trained_Model/"+Feature+'_'+str(parameter.how_many_times)+"/"
 
 MakeDir(model_path)
 model_name = model_path + "model"
+#
+# def Preprocess(img):
+#     if (parameter.channels == 1):
+#         img = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+#     img = cv2.resize(img, (resolution[1], resolution[0]))
+#     return np.reshape(img, resolution)
 
 def Preprocess(img):
-    if (parameter.channels == 1):
-        img = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
-    img = cv2.resize(img, (resolution[1], resolution[0]))
-    return np.reshape(img, resolution)
+    img = skimage.transform.resize(img, resolution)
+    img = img.astype(np.float32)
+    return img
 
 def Display_Training(iteration, how_many_times, train_scores):
     mean_training_scores = 0
@@ -92,6 +98,7 @@ def Display_Training(iteration, how_many_times, train_scores):
     print("Steps: {}/{} Episodes: {} Rewards: mean: {:.2f}, std: {:.2f}, min: {:.2f}, max: {:.2f}"
         .format(iteration, how_many_times, len(train_scores), mean_training_scores, std_training_scores,
          min_training_scores, max_training_scores),file=sys.stderr)
+    mean_training_scores=round(mean_training_scores,2)
     mean_scores.append(mean_training_scores)
     #print("Mean Scores",mean_scores)
 class ReplayMemory(object):
@@ -128,9 +135,11 @@ class Model(object):
     def __init__(self, session, actions_count):
 
         self.session = session
+        print('Training Using',Feature)
 
         # Create the input.
         self.s_ = tf.placeholder(shape=[None] + list(resolution), dtype=tf.float32)
+        self.s_audio_ = tf.placeholder(shape=[None] + list(resolution), dtype=tf.float32)
         self.q_ = tf.placeholder(shape=[None, actions_count], dtype=tf.float32)
 
         # Create the network.
@@ -138,12 +147,16 @@ class Model(object):
         conv2 = tf.contrib.layers.conv2d(conv1, num_outputs=32, kernel_size=[3, 3], stride=[2, 2])
         conv2_flat = tf.contrib.layers.flatten(conv2)
         fc1 = tf.contrib.layers.fully_connected(conv2_flat, num_outputs=128)
-
         self.q = tf.contrib.layers.fully_connected(fc1, num_outputs=actions_count, activation_fn=None)
+
+        conv1_audio = tf.contrib.layers.conv2d(self.s_audio_, num_outputs=16, kernel_size=[3, 3], stride=[2, 2])
+        conv2_audio = tf.contrib.layers.conv2d(conv1_audio, num_outputs=32, kernel_size=[3, 3], stride=[2, 2])
+        conv2_flat_audio = tf.contrib.layers.flatten(conv2_audio)
+        fc1_audio = tf.contrib.layers.fully_connected(conv2_flat_audio, num_outputs=128)
+        self.q_audio = tf.contrib.layers.fully_connected(fc1_audio, num_outputs=actions_count, activation_fn=None)
+
         self.action = tf.argmax(self.q, 1)
-
         self.loss = tf.losses.mean_squared_error(self.q_, self.q)
-
         self.optimizer = tf.train.RMSPropOptimizer(parameter.Learning_Rate)
         self.train_step = self.optimizer.minimize(self.loss)
 
@@ -206,8 +219,6 @@ class TrainAgent(object):
             a = random.randint(0, self.num_actions-1)
         else:
             a = self.model.GetAction(state)
-
-
         return a
 
     def perform_learning_step(self, iteration):
@@ -228,7 +239,6 @@ class TrainAgent(object):
         self.rewards += reward
 
         isterminal=env.IsEpisodeFinished()
-
 
         self.memory.Add(state, best_action, isterminal, reward)
         self.LearnFromMemory()
@@ -254,14 +264,14 @@ def Test_Model(agent):
 
     list_Episode = []
     list_Reward = []
-    how_many_times=3
+    how_many_times=5
 
     for i in range(1,how_many_times+1):
         print('Running Test',i)
         reward_list=[]
         episode_list=[]
         reward_total = 0
-        number_of_episodes = 10
+        number_of_episodes = 50
         test=0
         while (test < number_of_episodes):
 
@@ -287,9 +297,6 @@ def Test_Model(agent):
                     break
 
                 state_raw = env.Observation()
-        #print('Reward', reward_list)
-        #print('Episode',episode_list)
-
         list_Reward.append(reward_list)
         print('********************')
     print(list_Reward)
@@ -297,17 +304,16 @@ def Test_Model(agent):
     std_reward = np.std(list_Reward, axis=0)
     print('Mean Reward',mu_reward)
     print('Std Reward',std_reward)
-
-
-    time = np.arange(1, number_of_episodes + 1, 1.0)
-    plt.plot(time, mu_reward, color='green', label='Test Mean Reward')
-    #plt.fill_between(time, mu_reward-std_reward, mu_reward+std_reward, facecolor='blue', alpha=0.3)
-    plt.legend(loc='upper right')
-    plt.xlabel('Number of Episodes')
-    plt.ylabel('Mean Reward')
-    file_name = model_path+"Test_"+Feature + str(how_many_times) + '_' + str(number_of_episodes) + '.png'
-    plt.savefig(file_name)
-    plt.show()
+    #
+    # time = np.arange(1, len(list_Reward[0]) + 1, 1.0)
+    # plt.plot(time, mu_reward, color='green', label='Test Mean Reward')
+    # #plt.fill_between(time, mu_reward-std_reward, mu_reward+std_reward, facecolor='blue', alpha=0.3)
+    # plt.legend(loc='upper right')
+    # plt.xlabel('Number of Episodes')
+    # plt.ylabel('Mean Reward')
+    # file_name = model_path+"Test_"+Feature + '_' + str(how_many_times) + '_' + str(number_of_episodes) + '.png'
+    # plt.savefig(file_name)
+    # plt.show()
 
 if __name__ == '__main__':
 
@@ -320,9 +326,8 @@ if __name__ == '__main__':
     env = Environment(scenario_file)
     agent = TrainAgent(env.NumActions())
     reward_list_training=[]
-    how_many_times_training=3
     number_of_training_episodes=parameter.how_many_times/parameter.save_each
-    for i in range(1,how_many_times_training+1):
+    for i in range(1,parameter.how_many_times_training+1):
         mean_scores=[]
         if (Train_Model):
             print("Training",i)
@@ -333,15 +338,17 @@ if __name__ == '__main__':
     print("Mean List Reward",reward_list_training)
     mu_reward_training = np.mean(reward_list_training, axis=0)
     std_reward_training = np.std(reward_list_training, axis=0)
-    print('Mean Reward',mu_reward_training)
-    print('Std Reward',std_reward_training)
-    time = np.arange(1, number_of_training_episodes + 1, 1.0)
-    plt.plot(time, mu_reward_training, color='green', label='Reward')
+
+    number_of_steps = len(reward_list_training[0])
+    time = np.arange(1, number_of_steps + 1, 1.0)
+
+    plt.plot(time, mu_reward_training, color='green')#, label='Reward')
     plt.fill_between(time, mu_reward_training - std_reward_training, mu_reward_training + std_reward_training, facecolor='blue', alpha=0.3)
     plt.legend(loc='upper right')
-    plt.xlabel('Number of Episodes')
-    plt.ylabel('Mean Reward')
-    filename=model_path+'Training_'+Feature+str(parameter.how_many_times)+'.png'
+    plt.xlabel('Steps')
+    plt.ylabel('Reward')
+    plt.title(Feature)
+    filename=model_path+'Training_'+Feature+'.png'
     plt.savefig(filename)
     plt.show()
 

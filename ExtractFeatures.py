@@ -63,7 +63,7 @@ class Extract_Features:
             frames_read += read
             if read < hop_s: break
         if(distance==0):
-            factor=100
+            factor=1
         else:
             factor=1/distance
         return mfccs*factor
