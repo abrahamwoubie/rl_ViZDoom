@@ -60,7 +60,7 @@ if(parameter.use_MFCC):
     Feature='MFCC'
 
 if(parameter.use_Pixels):
-    resolution = (35, 45) + (parameter.channels,)
+    resolution = (60, 80) + (parameter.channels,)
     Feature='Pixels'
 
 if(parameter.use_samples):
@@ -73,16 +73,16 @@ model_path = Working_Directory + "/Trained_Model/"+Feature+'_'+str(parameter.how
 MakeDir(model_path)
 model_name = model_path + "model"
 #
-# def Preprocess(img):
-#     if (parameter.channels == 1):
-#         img = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
-#     img = cv2.resize(img, (resolution[1], resolution[0]))
-#     return np.reshape(img, resolution)
-
 def Preprocess(img):
-    img = skimage.transform.resize(img, resolution)
-    img = img.astype(np.float32)
-    return img
+    #if (parameter.channels == 1):
+        #img = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+    img = cv2.resize(img, (resolution[1], resolution[0]))
+    return np.reshape(img, resolution)
+
+# def Preprocess(img):
+#     img = skimage.transform.resize(img, resolution)
+#     img = img.astype(np.float32)
+#     return img
 
 def Display_Training(iteration, how_many_times, train_scores):
     mean_training_scores = 0
@@ -330,11 +330,11 @@ if __name__ == '__main__':
     for i in range(1,parameter.how_many_times_training+1):
         mean_scores=[]
         if (Train_Model):
-            print("Training",i)
+            print("Training Iteration {}, using {}".format(i,Feature))
             agent.Train()
             print('Mean Scores',mean_scores)
             reward_list_training.append(mean_scores)
-        Test_Model(agent)
+        #Test_Model(agent)
     print("Mean List Reward",reward_list_training)
     mu_reward_training = np.mean(reward_list_training, axis=0)
     std_reward_training = np.std(reward_list_training, axis=0)

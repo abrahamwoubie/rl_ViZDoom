@@ -7,7 +7,7 @@ class GlobalVariables :
 
     #parameters
     how_many_times_training=1
-    how_many_times = 200000
+    how_many_times = 2000000
     replay_memory_size = 100000
     replay_memory_batch_size = 64
 
@@ -15,7 +15,7 @@ class GlobalVariables :
     Discount_Factor = 0.99
 
     frame_repeat = 10
-    channels = 1
+    channels = 3
 
     channels_audio = 1
 
@@ -23,4 +23,4 @@ class GlobalVariables :
     end_eps = 0.1
     eps_decay_iter = 0.33 * how_many_times
 
-    save_each = 0.01 * how_many_times
+    save_each = 0.001 * how_many_times

@@ -9,6 +9,9 @@ from pydub.playback import play
 from ExtractFeatures import Extract_Features
 from GlobalVariables import GlobalVariables
 
+import scipy
+target_position_x = 100
+target_position_y = 100
 
 parameter=GlobalVariables
 Extract=Extract_Features
@@ -24,7 +27,9 @@ class Environment(object):
         self.game.set_screen_format(ScreenFormat.RGB24)
         #self.game.set_screen_resolution(ScreenResolution.RES_160X120)
         self.game.set_screen_resolution(ScreenResolution.RES_640X480)
-        self.game.set_render_hud(False) # False
+        #self.game.set_screen_resolution(ScreenResolution.RES_320X240)
+        #self.game.set_screen_format(ScreenFormat.CRCGCB)
+        self.game.set_render_hud(True) # False
         self.game.set_render_crosshair(False)
         self.game.set_render_weapon(False)
         self.game.set_render_decals(False)
@@ -43,7 +48,7 @@ class Environment(object):
         self.game.set_living_reward(0)
         self.game.set_mode(Mode.PLAYER)
 
-        self.game.set_labels_buffer_enabled(True)
+        self.game.set_labels_buffer_enabled(False)
         self.game.clear_available_game_variables()
         self.game.add_available_game_variable(GameVariable.POSITION_X)
         self.game.add_available_game_variable(GameVariable.POSITION_Y)
@@ -78,6 +83,14 @@ class Environment(object):
         if(parameter.use_samples):
             return (Extract.Extract_Samples(self,player_position_x,player_position_y))
         if (parameter.use_Pixels):
-            return (self.game.get_state().screen_buffer)/255
+            pixel_data=(self.game.get_state().screen_buffer)
+            player = [player_position_x, player_position_y]
+            target = [target_position_x, target_position_y]
+            distance = scipy.spatial.distance.euclidean(player, target)
+            if(distance==0):
+                factor=1
+            else:
+                factor=1/distance
+            return pixel_data*factor
     def MapActions(self, action_raw):
         return action_raw
