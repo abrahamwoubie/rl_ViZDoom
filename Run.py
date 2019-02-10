@@ -11,7 +11,6 @@ import os
 import matplotlib.pyplot as plt
 
 import numpy as np
-import cv2
 import tensorflow as tf
 import matplotlib.ticker as ticker
 
@@ -74,15 +73,9 @@ MakeDir(model_path)
 model_name = model_path + "model"
 #
 def Preprocess(img):
-    #if (parameter.channels == 1):
-        #img = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
-    img = cv2.resize(img, (resolution[1], resolution[0]))
-    return np.reshape(img, resolution)
-
-# def Preprocess(img):
-#     img = skimage.transform.resize(img, resolution)
-#     img = img.astype(np.float32)
-#     return img
+     img = skimage.transform.resize(img, resolution)
+     img = img.astype(np.float32)
+     return img
 
 def Display_Training(iteration, how_many_times, train_scores):
     mean_training_scores = 0
@@ -239,7 +232,17 @@ class TrainAgent(object):
         self.rewards += reward
 
         isterminal=env.IsEpisodeFinished()
-
+        '''
+        if not isterminal:
+                parameter.prev_reward=self.rewards
+                if self.rewards==1:
+                        self.rewards=0
+        else:
+                if self.rewards==1 or parameter.prev_reward==1:
+                        self.rewards=1
+                else:
+                        self.rewards=0
+	'''
         self.memory.Add(state, best_action, isterminal, reward)
         self.LearnFromMemory()
 
@@ -251,11 +254,9 @@ class TrainAgent(object):
             if(env.IsEpisodeFinished()):
                 train_scores.append(self.rewards)
                 self.rewards = 0
-                #reward_list_training.append(train_scores)
                 env.Reset()
             if (iteration % parameter.save_each == 0):
                 model_name_curr = model_name #+ "_{:04}".format(int(iteration / save_each))
-                #print("\nSaving the network weigths to", model_name_curr, file=sys.stderr)
                 self.saver.save(self.session, model_name_curr)
                 Display_Training(iteration,parameter.how_many_times, train_scores)
                 train_scores = []
@@ -287,8 +288,6 @@ def Test_Model(agent):
             best_action=agent.GetAction(state)
 
             for _ in range(parameter.frame_repeat):
-                #cv2.imshow("Frame Test", state_raw)
-                #cv2.waitKey(20)
 
                 reward = env.Make_Action(best_action, 1)
                 reward_total += reward
