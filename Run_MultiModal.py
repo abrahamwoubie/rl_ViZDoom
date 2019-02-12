@@ -91,8 +91,8 @@ def Display_Training(iteration, how_many_times, train_scores):
     #print("Mean Scores",mean_scores)
 class ReplayMemory(object):
     def __init__(self, capacity):
-
         self.s = np.zeros((capacity,) + resolution, dtype=np.uint8)
+        self.s_audio = np.zeros((capacity,) + resolution_audio, dtype=np.float64)
         self.a = np.zeros(capacity, dtype=np.int32)
         self.r = np.zeros(capacity, dtype=np.float32)
         self.isterminal = np.zeros(capacity, dtype=np.float32)
@@ -101,9 +101,9 @@ class ReplayMemory(object):
         self.size = 0
         self.pos = 0
 
-    def Add(self, s, action, isterminal, reward):
-
+    def Add(self, s, s_audio, action, isterminal, reward):
         self.s[self.pos, ...] = s
+        self.s_audio[self.pos, ...] = s_audio
         self.a[self.pos] = action
         self.isterminal[self.pos] = isterminal
         self.r[self.pos] = reward
@@ -117,7 +117,7 @@ class ReplayMemory(object):
         idx2 = []
         for i in idx:
             idx2.append(i + 1)
-        return self.s[idx], self.a[idx], self.s[idx2], self.isterminal[idx], self.r[idx]
+        return self.s[idx], self.s_audio[idx],self.a[idx], self.s[idx2], self.isterminal[idx], self.r[idx]
 
 class Model(object):
     def __init__(self, session, actions_count):
@@ -145,44 +145,35 @@ class Model(object):
         fc1 = tf.contrib.layers.fully_connected(multimodal, num_outputs=128)
         self.q = tf.contrib.layers.fully_connected(fc1, num_outputs=actions_count, activation_fn=None)
 
-
-        fc1_audio = tf.contrib.layers.fully_connected(conv2_flat_audio, num_outputs=128)
-        self.q_audio = tf.contrib.layers.fully_connected(fc1_audio, num_outputs=actions_count, activation_fn=None)
+        # fc1_audio = tf.contrib.layers.fully_connected(conv2_flat_audio, num_outputs=128)
+        # self.q_audio = tf.contrib.layers.fully_connected(fc1_audio, num_outputs=actions_count, activation_fn=None)
 
         self.action = tf.argmax(self.q, 1)
         self.loss = tf.losses.mean_squared_error(self.q_, self.q)
         self.optimizer = tf.train.RMSPropOptimizer(parameter.Learning_Rate)
         self.train_step = self.optimizer.minimize(self.loss)
 
-    def Learn(self, state, q):
+    def Learn(self, state, state_audio,q):
 
-        state = state.astype(np.float32)
-        l, _ = self.session.run([self.loss, self.train_step], feed_dict={self.s_ : state, self.q_: q})
+        l, _ = self.session.run([self.loss, self.train_step], feed_dict={self.s_ : state, self.s_audio_: state_audio, self.q_: q})
         return l
 
-    def GetQ(self, state):
 
-        state = state.astype(np.float32)
-        return self.session.run(self.q, feed_dict={self.s_ : state})
+    def GetQ(self, state,state_audio):
+        return self.session.run(self.q, feed_dict={self.s_: state,self.s_audio_:state_audio})
 
     def GetAction(self, state, state_audio):
 
-        state = state.astype(np.float32) #(30,45,3)
         state = state.reshape([1] + list(resolution))#(1, 30, 45, 3)
-
-        state_audio = state_audio.astype(np.float32)  # (1,100,1)
         state_audio = state_audio.reshape([1] + list(resolution_audio))  # (1, 1, 100, 1)
-
-        return self.session.run(self.action, feed_dict={self.s_: state,self.s_audio_:state_audio})[0]
+        best_action=self.session.run(self.action, feed_dict={self.s_: state,self.s_audio_:state_audio})[0]
+        return best_action
 
 class Train(object):
     def __init__(self, num_actions):
-		
+
         config = tf.ConfigProto()
         config.gpu_options.allow_growth = True
-        #config.log_device_placement = False
-        #config.allow_soft_placement = True
-
         self.session = tf.Session(config=config)
 
         self.model = Model(self.session, num_actions)
@@ -203,25 +194,24 @@ class Train(object):
     def LearnFromMemory(self):
 
         if (self.memory.size > 2*parameter.replay_memory_batch_size):
-            s1, a, s2, isterminal, r = self.memory.Get(parameter.replay_memory_batch_size)
-            q = self.model.GetQ(s1)
-            q2 = np.max(self.model.GetQ(s2), axis=1)
+            s1, s1_audio, a, s2, isterminal, r = self.memory.Get(parameter.replay_memory_batch_size)
+            q = self.model.GetQ(s1,s1_audio)
+            q2 = np.max(self.model.GetQ(s2,s1_audio), axis=1)
             q[np.arange(q.shape[0]), a] = r + (1 - isterminal) * parameter.Discount_Factor * q2
-            self.model.Learn(s1, q)
+            self.model.Learn(s1, s1_audio, q)
 
-    def GetAction(self, state,state_audio):
+    def GetAction(self, state):#,state_audio):
 
         if (random.random() <= 0.05):
             a = random.randint(0, self.num_actions-1)
         else:
-            a = self.model.GetAction(state,state_audio)
+            a = self.model.GetAction(state,self.state_audio)
         return a
 
     def perform_learning_step(self, iteration):
 
         state,state_audio=env.Observation()
         state,state_audio=Preprocess(state,state_audio)
-
         # Epsilon-greedy.
         if (iteration < parameter.eps_decay_iter):
             eps = parameter.start_eps - iteration / parameter.eps_decay_iter * (parameter.start_eps - parameter.end_eps)
@@ -234,19 +224,9 @@ class Train(object):
             best_action = self.model.GetAction(state,state_audio)
 
         self.reward = env.Make_Action(best_action, parameter.frame_repeat)
-
         isterminal=env.IsEpisodeFinished()
-        if not isterminal:
-                self.prev_reward=self.reward
-                if self.reward==1:
-                    self.reward=0
-        else:
-                if self.reward==1 or self.prev_reward==1:
-                        self.reward=1
-                else:
-                        self.reward=0
-        self.memory.Add(state, best_action, isterminal, self.reward)
-        #self.LearnFromMemory()
+        self.memory.Add(state, state_audio, best_action, isterminal, self.reward)
+        self.LearnFromMemory()
     def Train(self):
         train_scores = []
         env.Reset()
