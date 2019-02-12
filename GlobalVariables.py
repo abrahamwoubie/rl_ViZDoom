@@ -16,7 +16,7 @@ class GlobalVariables :
     Discount_Factor = 0.99
 
     frame_repeat = 10
-    channels = 3
+    channels = 1
 
     channels_audio = 1
 

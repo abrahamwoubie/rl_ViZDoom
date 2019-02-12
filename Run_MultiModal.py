@@ -54,32 +54,23 @@ scenario_file = Working_Directory + "Scenarios/find.wad"
 from Environment import Environment
 
 
-if(parameter.use_MFCC):
-    resolution = (455, 13) + (parameter.channels_audio,)
-    Feature='MFCC'
-
-if(parameter.use_Pixels):
-    resolution = (30, 45) + (parameter.channels,)
-    Feature='Pixels'
-
-if(parameter.use_spectrogram):
-    resolution = (30, 45) + (parameter.channels_audio,)
-    Feature='Spectrogram'
-
-if(parameter.use_samples):
-    resolution = (1,100) + (parameter.channels_audio,)
-    Feature='Samples'
-
+resolution = (30, 45) + (parameter.channels,)
+resolution_audio = (1,100) + (parameter.channels_audio,)
+Feature='Multimodal'
 model_path = Working_Directory + "/Trained_Model_Paper/"+Feature+'_'+str(parameter.how_many_times)+"/"
 
 MakeDir(model_path)
 model_name = model_path + "model"
 #
-def Preprocess(img):
-     #img = img[0].astype(np.float32) / 255.0
+def Preprocess(img,img_audio):
+     img = img[0].astype(np.float32) / 255.0
      img = skimage.transform.resize(img, resolution)
      img = img.astype(np.float32)
-     return img
+
+     img_audio = skimage.transform.resize(img_audio, resolution_audio)
+     img_audio = img_audio.astype(np.float32)
+
+     return img,img_audio
 
 def Display_Training(iteration, how_many_times, train_scores):
     mean_training_scores = 0
@@ -136,19 +127,25 @@ class Model(object):
 
         # Create the input.
         self.s_ = tf.placeholder(shape=[None] + list(resolution), dtype=tf.float32)
-        self.s_audio_ = tf.placeholder(shape=[None] + list(resolution), dtype=tf.float32)
+        self.s_audio_ = tf.placeholder(shape=[None] + list(resolution_audio), dtype=tf.float32)
         self.q_ = tf.placeholder(shape=[None, actions_count], dtype=tf.float32)
 
-        # Create the network.
+        # Create the network for the image.
         conv1 = tf.contrib.layers.conv2d(self.s_, num_outputs=16, kernel_size=[3, 3], stride=[2, 2])
         conv2 = tf.contrib.layers.conv2d(conv1, num_outputs=32, kernel_size=[3, 3], stride=[2, 2])
         conv2_flat = tf.contrib.layers.flatten(conv2)
-        fc1 = tf.contrib.layers.fully_connected(conv2_flat, num_outputs=128)
-        self.q = tf.contrib.layers.fully_connected(fc1, num_outputs=actions_count, activation_fn=None)
 
+        # Create the network for the audio
         conv1_audio = tf.contrib.layers.conv2d(self.s_audio_, num_outputs=16, kernel_size=[3, 3], stride=[2, 2])
         conv2_audio = tf.contrib.layers.conv2d(conv1_audio, num_outputs=32, kernel_size=[3, 3], stride=[2, 2])
         conv2_flat_audio = tf.contrib.layers.flatten(conv2_audio)
+
+        multimodal=tf.concat([conv2_flat,conv2_flat_audio],axis=1)
+
+        fc1 = tf.contrib.layers.fully_connected(multimodal, num_outputs=128)
+        self.q = tf.contrib.layers.fully_connected(fc1, num_outputs=actions_count, activation_fn=None)
+
+
         fc1_audio = tf.contrib.layers.fully_connected(conv2_flat_audio, num_outputs=128)
         self.q_audio = tf.contrib.layers.fully_connected(fc1_audio, num_outputs=actions_count, activation_fn=None)
 
@@ -168,11 +165,15 @@ class Model(object):
         state = state.astype(np.float32)
         return self.session.run(self.q, feed_dict={self.s_ : state})
 
-    def GetAction(self, state):
+    def GetAction(self, state, state_audio):
 
         state = state.astype(np.float32) #(30,45,3)
         state = state.reshape([1] + list(resolution))#(1, 30, 45, 3)
-        return self.session.run(self.action, feed_dict={self.s_: state})[0]
+
+        state_audio = state_audio.astype(np.float32)  # (1,100,1)
+        state_audio = state_audio.reshape([1] + list(resolution_audio))  # (1, 1, 100, 1)
+
+        return self.session.run(self.action, feed_dict={self.s_: state,self.s_audio_:state_audio})[0]
 
 class Train(object):
     def __init__(self, num_actions):
@@ -208,17 +209,19 @@ class Train(object):
             q[np.arange(q.shape[0]), a] = r + (1 - isterminal) * parameter.Discount_Factor * q2
             self.model.Learn(s1, q)
 
-    def GetAction(self, state):
+    def GetAction(self, state,state_audio):
 
         if (random.random() <= 0.05):
             a = random.randint(0, self.num_actions-1)
         else:
-            a = self.model.GetAction(state)
+            a = self.model.GetAction(state,state_audio)
         return a
 
     def perform_learning_step(self, iteration):
 
-        state=Preprocess(env.Observation())
+        state,state_audio=env.Observation()
+        state,state_audio=Preprocess(state,state_audio)
+
         # Epsilon-greedy.
         if (iteration < parameter.eps_decay_iter):
             eps = parameter.start_eps - iteration / parameter.eps_decay_iter * (parameter.start_eps - parameter.end_eps)
@@ -228,7 +231,7 @@ class Train(object):
         if (random.random() <= eps):
             best_action = random.randint(0, self.num_actions-1)
         else:
-            best_action = self.model.GetAction(state)
+            best_action = self.model.GetAction(state,state_audio)
 
         self.reward = env.Make_Action(best_action, parameter.frame_repeat)
 
@@ -236,14 +239,14 @@ class Train(object):
         if not isterminal:
                 self.prev_reward=self.reward
                 if self.reward==1:
-                	self.reward=0
+                    self.reward=0
         else:
                 if self.reward==1 or self.prev_reward==1:
                         self.reward=1
                 else:
                         self.reward=0
         self.memory.Add(state, best_action, isterminal, self.reward)
-        self.LearnFromMemory()
+        #self.LearnFromMemory()
     def Train(self):
         train_scores = []
         env.Reset()

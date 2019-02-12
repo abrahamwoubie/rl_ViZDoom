@@ -75,18 +75,28 @@ class Environment(object):
     def IsEpisodeFinished(self):
         return (self.game.is_episode_finished())
 
+    '''
+    def Observation(self):
+        s = self.game.get_state()
+        player_position_x = s.game_variables[0]
+        player_position_y = s.game_variables[1]
+        if (parameter.use_MFCC):
+            return (Extract.Extract_MFCC(self, player_position_x, player_position_y))
+        if (parameter.use_spectrogram):
+            return (Extract.Extract_Spectrogram(self, player_position_x, player_position_y))
+        if (parameter.use_samples):
+            return (Extract.Extract_Samples(self, player_position_x, player_position_y))
+        if (parameter.use_Pixels):
+            pixel_data = (self.game.get_state().screen_buffer)
+            return pixel_data[:, :, 1]
+    '''
     def Observation(self):
         s = self.game.get_state()
         player_position_x=s.game_variables[0]
         player_position_y=s.game_variables[1]
-        if(parameter.use_MFCC):
-            return (Extract.Extract_MFCC(self,player_position_x,player_position_y))
-        if(parameter.use_spectrogram):
-            return (Extract.Extract_Spectrogram(self,player_position_x,player_position_y))
-        if(parameter.use_samples):
-            return (Extract.Extract_Samples(self,player_position_x,player_position_y))
-        if (parameter.use_Pixels):
-            pixel_data=(self.game.get_state().screen_buffer)
-            return pixel_data[:,:,1]
+        samples= Extract.Extract_Samples(self,player_position_x,player_position_y)
+        pixel_data=(self.game.get_state().screen_buffer)
+        pixel_data=pixel_data[:,:,1]
+        return pixel_data,samples
     def MapActions(self, action_raw):
         return action_raw
