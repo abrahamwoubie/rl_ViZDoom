@@ -17,6 +17,7 @@ parameter=GlobalVariables
 Extract=Extract_Features
 
 class Environment(object):
+    prev_reward=None
     def __init__(self, scenario_path):
 
         print("Initializing the doom.")
@@ -34,12 +35,12 @@ class Environment(object):
         self.game.set_render_weapon(False)
         self.game.set_render_decals(False)
         self.game.set_render_particles(False)
-
+        
         self.game.add_available_button(Button.TURN_LEFT)
         self.game.add_available_button(Button.TURN_RIGHT)
         self.game.add_available_button(Button.MOVE_FORWARD)
         self.game.add_available_button(Button.MOVE_BACKWARD)
-
+        
         self.game.set_episode_timeout(2100)
         self.game.set_episode_start_time(14)
         self.game.set_window_visible(False)
@@ -80,17 +81,12 @@ class Environment(object):
         player_position_y=s.game_variables[1]
         if(parameter.use_MFCC):
             return (Extract.Extract_MFCC(self,player_position_x,player_position_y))
+        if(parameter.use_spectrogram):
+            return (Extract.Extract_Spectrogram(self,player_position_x,player_position_y))
         if(parameter.use_samples):
             return (Extract.Extract_Samples(self,player_position_x,player_position_y))
         if (parameter.use_Pixels):
             pixel_data=(self.game.get_state().screen_buffer)
-            player = [player_position_x, player_position_y]
-            target = [target_position_x, target_position_y]
-            distance = scipy.spatial.distance.euclidean(player, target)
-            if(distance==0):
-                factor=1
-            else:
-                factor=1/distance
-            return pixel_data*factor
+            return pixel_data[:,:,1]
     def MapActions(self, action_raw):
         return action_raw

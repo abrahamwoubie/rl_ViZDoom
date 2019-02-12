@@ -1,12 +1,13 @@
 class GlobalVariables :
 
     #options for running different experiments
-    use_MFCC = 1
+    use_MFCC = 0
     use_Pixels=0
-    use_samples=0
+    use_samples=1
+    use_spectrogram=0
 
     #parameters
-    how_many_times_training=3
+    how_many_times_training=5
     how_many_times = 600000
     replay_memory_size = 100000
     replay_memory_batch_size = 64
@@ -25,4 +26,3 @@ class GlobalVariables :
 
     save_each = 4000#0.00625 * how_many_times
 
-    prev_reward=None

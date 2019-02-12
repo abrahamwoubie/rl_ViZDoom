@@ -27,7 +27,7 @@ class Extract_Features:
         self.sample_freq, self.segment_time, self.spec_data = signal.spectrogram(self.data, self.sample_rate)
 
         if(distance==0):
-            factor=100
+            factor=1
         else:
             factor=1/distance
         return self.spec_data * factor

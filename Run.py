@@ -62,17 +62,21 @@ if(parameter.use_Pixels):
     resolution = (30, 45) + (parameter.channels,)
     Feature='Pixels'
 
+if(parameter.use_spectrogram):
+    resolution = (30, 45) + (parameter.channels_audio,)
+    Feature='Spectrogram'
+
 if(parameter.use_samples):
     resolution = (1,100) + (parameter.channels_audio,)
     Feature='Samples'
 
-
-model_path = Working_Directory + "/Trained_Model/"+Feature+'_'+str(parameter.how_many_times)+"/"
+model_path = Working_Directory + "/Trained_Model_Paper/"+Feature+'_'+str(parameter.how_many_times)+"/"
 
 MakeDir(model_path)
 model_name = model_path + "model"
 #
 def Preprocess(img):
+     #img = img[0].astype(np.float32) / 255.0
      img = skimage.transform.resize(img, resolution)
      img = img.astype(np.float32)
      return img
@@ -166,14 +170,13 @@ class Model(object):
 
     def GetAction(self, state):
 
-        state = state.astype(np.float32) #(40,40,3)
-        state = state.reshape([1] + list(resolution))#(1, 40, 40, 3)
+        state = state.astype(np.float32) #(30,45,3)
+        state = state.reshape([1] + list(resolution))#(1, 30, 45, 3)
         return self.session.run(self.action, feed_dict={self.s_: state})[0]
 
-class TrainAgent(object):
-
+class Train(object):
     def __init__(self, num_actions):
-
+		
         config = tf.ConfigProto()
         config.gpu_options.allow_growth = True
         #config.log_device_placement = False
@@ -183,8 +186,7 @@ class TrainAgent(object):
 
         self.model = Model(self.session, num_actions)
         self.memory = ReplayMemory(parameter.replay_memory_size)
-
-        self.rewards = 0
+        #self.rewards = 0
 
         self.saver = tf.train.Saver(max_to_keep=1000)
         if (Load_Model):
@@ -228,32 +230,27 @@ class TrainAgent(object):
         else:
             best_action = self.model.GetAction(state)
 
-        reward = env.Make_Action(best_action, parameter.frame_repeat)
-        self.rewards += reward
+        self.reward = env.Make_Action(best_action, parameter.frame_repeat)
 
         isterminal=env.IsEpisodeFinished()
-        '''
         if not isterminal:
-                parameter.prev_reward=self.rewards
-                if self.rewards==1:
-                        self.rewards=0
+                self.prev_reward=self.reward
+                if self.reward==1:
+                	self.reward=0
         else:
-                if self.rewards==1 or parameter.prev_reward==1:
-                        self.rewards=1
+                if self.reward==1 or self.prev_reward==1:
+                        self.reward=1
                 else:
-                        self.rewards=0
-	'''
-        self.memory.Add(state, best_action, isterminal, reward)
+                        self.reward=0
+        self.memory.Add(state, best_action, isterminal, self.reward)
         self.LearnFromMemory()
-
     def Train(self):
         train_scores = []
         env.Reset()
         for iteration in range(1, parameter.how_many_times+1):
             self.perform_learning_step(iteration)
             if(env.IsEpisodeFinished()):
-                train_scores.append(self.rewards)
-                self.rewards = 0
+                train_scores.append(self.reward)
                 env.Reset()
             if (iteration % parameter.save_each == 0):
                 model_name_curr = model_name #+ "_{:04}".format(int(iteration / save_each))
@@ -323,7 +320,7 @@ if __name__ == '__main__':
     if (args.gpu):
         os.environ["CUDA_VISIBLE_DEVICES"] = args.gpu
     env = Environment(scenario_file)
-    agent = TrainAgent(env.NumActions())
+    agent = Train(env.NumActions())
     reward_list_training=[]
     number_of_training_episodes=parameter.how_many_times/parameter.save_each
     for i in range(1,parameter.how_many_times_training+1):
