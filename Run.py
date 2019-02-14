@@ -11,6 +11,8 @@ import os
 import matplotlib.pyplot as plt
 
 import numpy as np
+import cv2
+from cv2 import VideoWriter, VideoWriter_fourcc, imread, resize
 import tensorflow as tf
 import matplotlib.ticker as ticker
 
@@ -48,6 +50,8 @@ def MakeDir(path):
 Load_Model = False
 Train_Model = True
 
+save_video = True
+test_display = True
 Working_Directory = "./"
 scenario_file = Working_Directory + "Scenarios/find.wad"
 
@@ -59,7 +63,7 @@ if(parameter.use_MFCC):
     Feature='MFCC'
 
 if(parameter.use_Pixels):
-    resolution = (30, 45) + (parameter.channels,)
+    resolution = (40, 40) + (parameter.channels,)
     Feature='Pixels'
 
 if(parameter.use_spectrogram):
@@ -76,7 +80,7 @@ MakeDir(model_path)
 model_name = model_path + "model"
 #
 def Preprocess(img):
-     #img = img[0].astype(np.float32) / 255.0
+     img = img[0].astype(np.float32) / 255.0
      img = skimage.transform.resize(img, resolution)
      img = img.astype(np.float32)
      return img
@@ -102,6 +106,7 @@ class ReplayMemory(object):
     def __init__(self, capacity):
 
         self.s = np.zeros((capacity,) + resolution, dtype=np.uint8)
+        self.s2 = np.zeros((capacity,) + resolution, dtype=np.uint8)
         self.a = np.zeros(capacity, dtype=np.int32)
         self.r = np.zeros(capacity, dtype=np.float32)
         self.isterminal = np.zeros(capacity, dtype=np.float32)
@@ -110,10 +115,12 @@ class ReplayMemory(object):
         self.size = 0
         self.pos = 0
 
-    def Add(self, s, action, isterminal, reward):
+    def Add(self, s, action, s2, isterminal, reward):
 
         self.s[self.pos, ...] = s
         self.a[self.pos] = action
+        if not isterminal:
+            self.s2[self.pos, ...] = s2
         self.isterminal[self.pos] = isterminal
         self.r[self.pos] = reward
 
@@ -123,10 +130,11 @@ class ReplayMemory(object):
     def Get(self, sample_size):
 
         idx = random.sample(range(0, self.size-2), sample_size)
-        idx2 = []
-        for i in idx:
-            idx2.append(i + 1)
-        return self.s[idx], self.a[idx], self.s[idx2], self.isterminal[idx], self.r[idx]
+        return self.s[idx], self.a[idx], self.s2[idx], self.isterminal[idx], self.r[idx]
+        #idx2 = []
+        #for i in idx:
+            #idx2.append(i + 1)
+        #return self.s[idx], self.a[idx], self.s[idx2], self.isterminal[idx], self.r[idx]
 
 class Model(object):
     def __init__(self, session, actions_count):
@@ -141,16 +149,10 @@ class Model(object):
 
         # Create the network.
         conv1 = tf.contrib.layers.conv2d(self.s_, num_outputs=16, kernel_size=[3, 3], stride=[2, 2])
-        conv2 = tf.contrib.layers.conv2d(conv1, num_outputs=32, kernel_size=[3, 3], stride=[2, 2])
+        conv2 = tf.contrib.layers.conv2d(conv1, num_outputs=16, kernel_size=[3, 3], stride=[2, 2])
         conv2_flat = tf.contrib.layers.flatten(conv2)
         fc1 = tf.contrib.layers.fully_connected(conv2_flat, num_outputs=128)
         self.q = tf.contrib.layers.fully_connected(fc1, num_outputs=actions_count, activation_fn=None)
-
-        conv1_audio = tf.contrib.layers.conv2d(self.s_audio_, num_outputs=16, kernel_size=[3, 3], stride=[2, 2])
-        conv2_audio = tf.contrib.layers.conv2d(conv1_audio, num_outputs=32, kernel_size=[3, 3], stride=[2, 2])
-        conv2_flat_audio = tf.contrib.layers.flatten(conv2_audio)
-        fc1_audio = tf.contrib.layers.fully_connected(conv2_flat_audio, num_outputs=128)
-        self.q_audio = tf.contrib.layers.fully_connected(fc1_audio, num_outputs=actions_count, activation_fn=None)
 
         self.action = tf.argmax(self.q, 1)
         self.loss = tf.losses.mean_squared_error(self.q_, self.q)
@@ -174,7 +176,7 @@ class Model(object):
         state = state.reshape([1] + list(resolution))#(1, 30, 45, 3)
         return self.session.run(self.action, feed_dict={self.s_: state})[0]
 
-class Train(object):
+class Agent(object):
     def __init__(self, num_actions):
 		
         config = tf.ConfigProto()
@@ -216,7 +218,7 @@ class Train(object):
             a = self.model.GetAction(state)
         return a
 
-    def perform_learning_step(self, iteration):
+    def step(self, iteration):
 
         state=Preprocess(env.Observation())
         # Epsilon-greedy.
@@ -233,22 +235,14 @@ class Train(object):
         self.reward = env.Make_Action(best_action, parameter.frame_repeat)
 
         isterminal=env.IsEpisodeFinished()
-        if not isterminal:
-                self.prev_reward=self.reward
-                if self.reward==1:
-                	self.reward=0
-        else:
-                if self.reward==1 or self.prev_reward==1:
-                        self.reward=1
-                else:
-                        self.reward=0
-        self.memory.Add(state, best_action, isterminal, self.reward)
+        s2 = Preprocess(env.Observation()) if not isterminal else None
+        self.memory.Add(state, best_action, s2, isterminal, self.reward)
         self.LearnFromMemory()
     def Train(self):
         train_scores = []
         env.Reset()
         for iteration in range(1, parameter.how_many_times+1):
-            self.perform_learning_step(iteration)
+            self.step(iteration)
             if(env.IsEpisodeFinished()):
                 train_scores.append(self.reward)
                 env.Reset()
@@ -258,18 +252,25 @@ class Train(object):
                 Display_Training(iteration,parameter.how_many_times, train_scores)
                 train_scores = []
         env.Reset()
-def Test_Model(agent):
+
+def Test(agent):
+
+    if (save_video):
+        size = (640, 480)
+        fps = 30.0  # / frame_repeat
+        fourcc = cv2.VideoWriter_fourcc(*'XVID')
+        out_video = cv2.VideoWriter(Working_Directory + "test1.avi", fourcc, fps, size)
 
     list_Episode = []
     list_Reward = []
-    how_many_times=5
+    how_many_times=1
 
     for i in range(1,how_many_times+1):
         print('Running Test',i)
         reward_list=[]
         episode_list=[]
         reward_total = 0
-        number_of_episodes = 50
+        number_of_episodes = 2
         test=0
         while (test < number_of_episodes):
 
@@ -277,7 +278,6 @@ def Test_Model(agent):
                 env.Reset()
                 print("Total reward: {}".format(reward_total))
                 reward_list.append(reward_total)
-                #episode_list.append(test)
                 reward_total = 0
                 test=test+1
             state_raw = env.Observation()
@@ -285,6 +285,14 @@ def Test_Model(agent):
             best_action=agent.GetAction(state)
 
             for _ in range(parameter.frame_repeat):
+
+                # Display.
+                # if (test_display):
+                #     cv2.imshow("frame-test", state_raw)
+                #     cv2.waitKey(20)
+
+                if (save_video):
+                    out_video.write(state_raw)
 
                 reward = env.Make_Action(best_action, 1)
                 reward_total += reward
@@ -300,16 +308,6 @@ def Test_Model(agent):
     std_reward = np.std(list_Reward, axis=0)
     print('Mean Reward',mu_reward)
     print('Std Reward',std_reward)
-    #
-    # time = np.arange(1, len(list_Reward[0]) + 1, 1.0)
-    # plt.plot(time, mu_reward, color='green', label='Test Mean Reward')
-    # #plt.fill_between(time, mu_reward-std_reward, mu_reward+std_reward, facecolor='blue', alpha=0.3)
-    # plt.legend(loc='upper right')
-    # plt.xlabel('Number of Episodes')
-    # plt.ylabel('Mean Reward')
-    # file_name = model_path+"Test_"+Feature + '_' + str(how_many_times) + '_' + str(number_of_episodes) + '.png'
-    # plt.savefig(file_name)
-    # plt.show()
 
 if __name__ == '__main__':
 
@@ -320,33 +318,35 @@ if __name__ == '__main__':
     if (args.gpu):
         os.environ["CUDA_VISIBLE_DEVICES"] = args.gpu
     env = Environment(scenario_file)
-    agent = Train(env.NumActions())
+    agent = Agent(env.NumActions())
     reward_list_training=[]
     number_of_training_episodes=parameter.how_many_times/parameter.save_each
-    for i in range(1,parameter.how_many_times_training+1):
-        mean_scores=[]
-        if (Train_Model):
-            print("Training Iteration {}, using {}".format(i,Feature))
-            agent.Train()
-            print('Mean Scores',mean_scores)
-            reward_list_training.append(mean_scores)
-        #Test_Model(agent)
-    print("Mean List Reward",reward_list_training)
-    mu_reward_training = np.mean(reward_list_training, axis=0)
-    std_reward_training = np.std(reward_list_training, axis=0)
 
-    number_of_steps = len(reward_list_training[0])
-    time = np.arange(1, number_of_steps + 1, 1.0)
+    if(Train_Model):
 
-    plt.plot(time, mu_reward_training, color='green')#, label='Reward')
-    plt.fill_between(time, mu_reward_training - std_reward_training, mu_reward_training + std_reward_training, facecolor='blue', alpha=0.3)
-    plt.legend(loc='upper right')
-    plt.xlabel('Steps')
-    plt.ylabel('Reward')
-    plt.title(Feature)
-    filename=model_path+'Training_'+Feature+'.png'
-    plt.savefig(filename)
-    plt.show()
+        for i in range(1,parameter.how_many_times_training+1):
+            mean_scores=[]
+            if (Train_Model):
+                print("Training Iteration {}, using {}".format(i,Feature))
+                agent.Train()
+                print('Mean Scores',mean_scores)
+                reward_list_training.append(mean_scores)
+        print("Mean List Reward",reward_list_training)
+        mu_reward_training = np.mean(reward_list_training, axis=0)
+        std_reward_training = np.std(reward_list_training, axis=0)
+
+        number_of_steps = len(reward_list_training[0])
+        time = np.arange(1, number_of_steps + 1, 1.0)
+
+        plt.plot(time, mu_reward_training, color='green')#, label='Reward')
+        plt.fill_between(time, mu_reward_training - std_reward_training, mu_reward_training + std_reward_training, facecolor='blue', alpha=0.3)
+        plt.legend(loc='upper right')
+        plt.xlabel('Steps')
+        plt.ylabel('Reward')
+        plt.title(Feature)
+        filename=model_path+'Training_'+Feature+'.png'
+        plt.savefig(filename)
+        plt.show()
 
 
-    #Test_Model(agent)
+    Test(agent)
